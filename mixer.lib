@@ -1,0 +1,137 @@
+//################################ mixer.lib ##########################################
+// Faust Mixer library
+//########################################################################################
+
+declare name "Faust Mixer Library";
+declare version "0.0";
+declare author "Gabriele Petrillo";
+
+//---------------------------`Equalizer`---------------------------
+// Classic Four-Band parametric equalizer with lowshelf, two peak filter
+// with gain and frequency controll and a highshelf filter.
+//
+// #### Usage
+//
+// ```
+// _ : equalizer : _
+// ```
+//------------------------------------------------------------
+
+equalizer = eqgroup(lsh : lowm: highm : hsh)
+    with{
+        eqgroup(x) = vgroup("eq", x);
+        highgroup(x) = hgroup("[01]him", x);
+        lowgroup(x) = hgroup("[02]lowm", x);
+
+       lp = nentry("[03]bass[style:knob]", 0, -24, 24, 0.01) : si.smoo;
+       hp = nentry("[01]high[style:knob]", 0, -24, 24, 0.01) : si.smoo;
+       lsh = fi.low_shelf(lp, 200);
+       hsh = fi.high_shelf(hp, 10000);
+
+        lowm = fi.peak_eq(pl, frq, bp)
+         with{
+              q  = 0.8;
+              bp = frq/q; //q costatante
+              frq = lowgroup(nentry("[01]frq1[style:knob][scale:lin]", 80, 80, 1900, 0.1) : si.smoo);
+              pl = lowgroup(nentry("[02]midbass[style:knob]", 0, -24, 24, 0.01) : si.smoo);
+
+        };
+
+        highm = fi.peak_eq(pl, frq, bp)
+             with{
+                q  = 0.8;
+                bp = frq/q; //q costatante
+                frq = highgroup(nentry("[01]frq2[style:knob][scale:lin]", 550, 550, 13000, 0.1) : si.smoo);
+                pl = highgroup(nentry("[02]midhigh[style:knob][unit:db]", 0, -24, 24, 0.01) : si.smoo);
+        };
+    };
+
+//---------------------------`Gain`---------------------------
+// Amplitude controll (knob) +/- 12dB
+//
+// #### Usage
+//
+// ```
+// _ : gain : _
+// ```
+//------------------------------------------------------------
+
+    gain = _ * gain  //gain
+        with{
+            gain = nentry("gain[style:knob][unit:db]", -12,-12,12,0.1): ba.db2linear : si.smoo;
+        };
+
+//---------------------------`Fader`---------------------------
+// Amplitude controll (vertical slider) -96dB/+12dB
+//
+// #### Usage
+//
+// ```
+// _ : fader : _
+// ```
+//------------------------------------------------------------
+
+    fader = _ * fader
+        with{
+            fader = vslider("vol", -96, -96, 12, 0.01) : ba.db2linear : si.smoo;
+        };
+
+//---------------------------`Insel`---------------------------
+// Input source selection
+//
+// #### Usage
+//
+// ```
+// _ : insel : _
+// ```
+//------------------------------------------------------------
+
+insel = ba.selectn(2, channel) : _   //in selection
+    with{
+       channel = nentry("[01]input[style:menu{'in1':0;'in2':1}]",0,0,2,1) : int;
+    };
+
+//---------------------------`panpot_lin`---------------------------
+// Linear panpot
+//
+// #### Usage
+//
+// ```
+// _ : panpot_lin : _,_
+// ```
+//------------------------------------------------------------
+
+panpot_lin= _<:_*(c),_*(1-c)
+    with {
+     c=(nentry("pan[style:knob]",0.5,0,1,0.01):si.smoo);
+    };
+
+//---------------------------`panpot_quad`---------------------------
+// Quadratic panpot
+//
+// #### Usage
+//
+// ```
+// _ : panpot_quad : _,_
+// ```
+//------------------------------------------------------------
+
+panpot_quad = _ <: _ * sqrt(c), _ * sqrt(1-c)
+    with {
+      c=(nentry("[03]pan[style:knob]",0.5,0,1,0.01):si.smoo);
+    };
+
+//---------------------------`mute`---------------------------
+// Mute
+//
+// #### Usage
+//
+// ```
+// _ : mute : _
+// ```
+//------------------------------------------------------------
+
+mute = _ * mute
+    with{
+      mute = (1 - checkbox("mute"));
+      };
