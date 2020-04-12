@@ -135,3 +135,152 @@ mute = _ * mute
     with{
       mute = (1 - checkbox("mute"));
       };
+//---------------------------`aux`---------------------------
+// Aux
+//
+// #### Usage
+//
+// ```
+// _ : aux : _
+// ```
+//------------------------------------------------------------
+
+aux(d) = auxgroup(mandata)
+    with{
+        auxgroup(x) = vgroup("aux", x);
+        aux(v) = _ * nentry("aux %v[style:knob]", 0,0,1,0.001) : si.smoo;
+        bus(i) = par(i, d, aux(i+1));
+        mandata = _ <: bus;
+    };
+
+//---------------------------`fader`---------------------------
+// Aux
+//
+// #### Usage
+//
+// ```
+// _ : aux : _
+// ```
+//------------------------------------------------------------
+
+fader = slider
+    with{
+        fadergroup(x) = hgroup("fader", x);
+        fader = _ * (vslider("[01]vol", -96, -96, 12, 0.01) : ba.db2linear : si.smoo);
+        meter(x) = attach(x, an.amp_follower(0.150, x) : ba.linear2db : vbargraph("[02]METER[unit:dB]", -96, +12));
+        slider = fadergroup(fader) : fadergroup(meter);
+    };
+
+//---------------------------`master`---------------------------
+// Master out
+//
+// #### Usage
+//
+// ```
+// _,_ : master : _,_
+// ```
+//--------------------------------------------------------
+
+master = out
+    with{
+        fadergroup(x) = hgroup("fader", x);
+        fader = _ * (vslider("[01]vol", -96, -96, 12, 0.01) : ba.db2linear : si.smoo);
+        meterL(x) = attach(x, an.amp_follower(0.150, x) : ba.linear2db : vbargraph("[02]L[unit:dB]", -96, +12));
+        meterR(x) = attach(x, an.amp_follower(0.150, x) : ba.linear2db : vbargraph("[03]R[unit:dB]", -96, +12));
+        out = (fadergroup(fader) : fadergroup(meterR)),(fadergroup(fader) : fadergroup(meterL));
+    };
+
+//---------------------------`mixer`---------------------------
+// Mixer(P,D)
+//
+// P = number of channels
+// D = number of aux
+// #### Usage
+//
+// ```
+// process = mixer(P,D);
+// ```
+//--------------------------------------------------------
+
+    mixer(P,D) = out
+      with{
+        mixergroup(x) = hgroup("mixer", x);
+        auxgroup(x) = vgroup("aux", x);
+        mixer = par(i, P, ch(i+1));
+        outaux = par(i, D, _);
+        out = mixergroup(mixer) :> mixergroup(master), outaux;
+
+        gain = _ * gain
+           with{
+                gain = nentry("[01]gain[style:knob][unit:db]", -12,-12,12,0.1): ba.db2linear : si.smoo;
+            };
+
+        equalizer = eqgroup(lsh : lowm: highm : hsh)
+            with{
+                eqgroup(x) = vgroup("[02]eq", x);
+                highgroup(x) = hgroup("[01]him", x);
+                lowgroup(x) = hgroup("[02]lowm", x);
+                lp = nentry("[03]bass[style:knob]", 0, -24, 24, 0.01) : si.smoo;
+                hp = nentry("[01]high[style:knob]", 0, -24, 24, 0.01) : si.smoo;
+                lsh = fi.low_shelf(lp, 200);
+                hsh = fi.high_shelf(hp, 10000);
+                lowm = fi.peak_eq(pl, frq, bp)
+                    with{
+                        q = 0.8;
+                        bp = frq/q; //q costatante
+                        frq = lowgroup(nentry("[01]frq1[style:knob][scale:lin]", 80, 80, 1900, 0.1) : si.smoo);
+                        pl = lowgroup(nentry("[02]midbass[style:knob]", 0, -24, 24, 0.01) : si.smoo);
+                    };
+                highm = fi.peak_eq(pl, frq, bp)
+                    with{
+                        q = 0.8;
+                        bp = frq/q; //q costatante
+                        frq = highgroup(nentry("[01]frq2[style:knob][scale:lin]", 550, 550, 13000, 0.1) : si.smoo);
+                        pl = highgroup(nentry("[02]midhigh[style:knob][unit:db]", 0, -24, 24, 0.01) : si.smoo);
+                    };
+            };
+
+        panpot_2= _<:_*(c),_*(1-c)
+            with {
+                c = (nentry("[03]pan[style:knob]",0.5,0,1,0.01):si.smoo);
+            }; // panpot lineare
+
+      fader = slider
+        with{
+            fadergroup(x) = hgroup("fader", x);
+            fader = _ * (vslider("[01]vol", -96, -96, 12, 0.01) : ba.db2linear : si.smoo);
+            meter(x) = attach(x, an.amp_follower(0.150, x) : ba.linear2db : vbargraph("[02]METER[unit:dB]", -96, +12));
+            slider = fadergroup(fader) : fadergroup(meter);
+        };
+
+        ch(v) = vgroup("CH %v", gain : equalizer : mute <:(fader <: panpot_2, rev), aux);
+
+    master = out
+        with{
+            fadergroup(x) = mastergroup(hgroup("fader", x));
+            fader = _ * (vslider("[01]vol", -96, -96, 12, 0.01) : ba.db2linear : si.smoo);
+            meterL(x) = attach(x, an.amp_follower(0.150, x) : ba.linear2db : vbargraph("[02]L[unit:dB]", -96, +12));
+            meterR(x) = attach(x, an.amp_follower(0.150, x) : ba.linear2db : vbargraph("[03]R[unit:dB]", -96, +12));
+            ef = _ <: dm.zita_light;
+            mastergroup(x) = vgroup("master",x);
+            out = (_,_), mastergroup(ef) :> (fadergroup(fader) : fadergroup(meterR)),(fadergroup(fader) : fadergroup(meterL));
+        };
+
+        rev = fx
+        with{
+            fx = _ * nentry("fx[style:knob]", 0,0,1,0.001) : si.smoo;
+        };
+
+      aux = auxgroup(mandata)
+        with{
+            auxgroup(x) = vgroup("aux", x);
+            aux(v) = _ * nentry("aux %v[style:knob]", 0,0,1,0.001) : si.smoo;
+            bus(i) = par(i, D, aux(i+1));
+            mandata = _ <: bus;
+        };
+
+        mute = _ * mute
+            with{
+              mute = (1 - checkbox("mute"));
+          };
+    };
