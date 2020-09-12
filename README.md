@@ -1,2 +1,2 @@
-# FLAD
-Faust Libraries Audio Device
+# LAD
+Libraries Audio Device
